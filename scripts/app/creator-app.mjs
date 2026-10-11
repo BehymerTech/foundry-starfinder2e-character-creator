@@ -1,18 +1,50 @@
-import { loadIndex, getDoc, heritagesFor, featIndex, slugOf, MODULE_ID } from "../lib/compendium.mjs";
+import {
+    MODULE_ID,
+    featIndex,
+    getDoc,
+    heritagesFor,
+    loadIndex,
+    loadKnownNames,
+    slugOf,
+} from "../lib/compendium.mjs";
+import { evaluatePrerequisites, normalizeName } from "../lib/prereqs.mjs";
 import {
     ATTRIBUTES,
     FREE_BOOSTS_PER_BATCH,
     MAX_LEVEL,
     additionalSkillCount,
+    applyBoost,
+    cartTotal,
     featSlotsAtLevel,
     hasAttributeBoosts,
     hasSkillIncrease,
     isFeatEligible,
+    isStarterItem,
+    lineCost,
     normalizeSlots,
+    prerequisiteText,
+    purchaseUnit,
     resolveSlots,
+    shopCategory,
     validateCreationBuild,
 } from "../lib/rules.mjs";
-import { applyCreation, applyLevelUp } from "./apply.mjs";
+import {
+    SPELLCASTERS,
+    isSpellEligible,
+    parseGrantedSpells,
+    spellKey,
+    spellPlan,
+    traditionFromRules,
+} from "../lib/spells.mjs";
+import {
+    applyCreation,
+    applyLevelUp,
+    applyPurchases,
+    applySpells,
+    completeSetupStep,
+    getPendingSetup,
+    setPendingSetup,
+} from "./apply.mjs";
 import { STEP_VIEWS, esc, t } from "./views.mjs";
 
 const { ApplicationV2 } = foundry.applications.api;
@@ -20,7 +52,7 @@ const { ApplicationV2 } = foundry.applications.api;
 const CREATE_STEPS = ["ancestry", "heritage", "background", "class", "attributes", "skills", "feats", "review"];
 
 /** Steps whose view is a gallery with an info pane. */
-const DETAIL_STEPS = new Set(["ancestry", "heritage", "background", "class", "feats", "overview"]);
+const DETAIL_STEPS = new Set(["ancestry", "heritage", "background", "class", "feats", "overview", "spells", "equipment"]);
 
 const instances = new Map();
 
@@ -29,8 +61,14 @@ export class CharacterCreatorApp extends ApplicationV2 {
         classes: ["sf2e-cc"],
         tag: "div",
         window: { icon: "fa-solid fa-user-astronaut", resizable: true },
-        position: { width: 1040, height: 720 },
+        position: { width: 1100, height: 760 },
     };
+
+    /** Which flow an actor needs: finish a half-set-up character, level one up, or build from scratch. */
+    static modeFor(actor) {
+        if (getPendingSetup(actor).length) return "setup";
+        return actor?.class ? "levelup" : "create";
+    }
 
     /**
      * Open the wizard. With no actor it starts a brand new character; with an actor lacking a class it
@@ -44,7 +82,7 @@ export class CharacterCreatorApp extends ApplicationV2 {
             ui.notifications.warn(t("NotACharacter"));
             return null;
         }
-        if (actor?.class && actor.level >= MAX_LEVEL) {
+        if (CharacterCreatorApp.modeFor(actor) === "levelup" && actor.level >= MAX_LEVEL) {
             ui.notifications.info(t("MaxLevel"));
             return null;
         }
@@ -58,12 +96,15 @@ export class CharacterCreatorApp extends ApplicationV2 {
         super(options);
         this.actor = actor;
         this.instanceKey = actor?.uuid ?? "new";
-        this.mode = actor?.class ? "levelup" : "create";
-        this.target = this.mode === "levelup" ? actor.level + 1 : 1;
+        this.mode = CharacterCreatorApp.modeFor(actor);
+        this.target = this.mode === "levelup" ? actor.level + 1 : this.mode === "setup" ? actor.level : 1;
+        this.setupSteps = this.mode === "setup" ? getPendingSetup(actor) : [];
+        this.built = this.mode === "setup";
         this.stepIndex = 0;
         this.busy = false;
         this.name = actor?.name ?? "";
         this.allowRare = game.settings.get(MODULE_ID, "allowRare");
+        this.showUnqualified = false;
         this.searchText = "";
         this.detailUuid = null;
 
@@ -75,12 +116,26 @@ export class CharacterCreatorApp extends ApplicationV2 {
         this.skillPicks = new Set();
         this.featPicks = {};
         this.candidates = {};
+        this.prereqStatus = {};
         this.lu = { boosts: [], skill: null };
         this.noHeritage = false;
+
+        // Spells
+        this.spell = null;
+        this.spellPicks = {};
+        this.anyRank = 1;
+        this.traditionOverride = null;
+
+        // Equipment
+        this.shopItems = [];
+        this.shopCategory = "weapons";
+        this.cart = new Map();
     }
 
     get title() {
-        return this.mode === "levelup" ? t("TitleLevelUp", { name: this.actor.name, level: this.target }) : t("TitleCreate");
+        if (this.mode === "levelup") return t("TitleLevelUp", { name: this.actor.name, level: this.target });
+        if (this.mode === "setup") return t("TitleSetup", { name: this.actor.name });
+        return t("TitleCreate");
     }
 
     /* -------------------------------------------- */
@@ -88,21 +143,60 @@ export class CharacterCreatorApp extends ApplicationV2 {
     /* -------------------------------------------- */
 
     get steps() {
-        if (this.mode === "create") return CREATE_STEPS;
+        if (this.mode === "setup") return this.setupSteps;
+        if (this.mode === "create") return [...CREATE_STEPS, ...this.plannedSetup];
         const steps = ["overview"];
         if (hasAttributeBoosts(this.target)) steps.push("attributes");
         if (this.hasSkillIncrease) steps.push("skills");
         if (this.featSlots.length) steps.push("feats");
+        if (this.levelUpHasSpells) steps.push("spells");
         steps.push("review");
         return steps;
+    }
+
+    /** Steps that follow building the character: spells for casters, then shopping. */
+    get plannedSetup() {
+        return this.casterConfig ? ["spells", "equipment"] : ["equipment"];
     }
 
     get stepId() {
         return this.steps[this.stepIndex];
     }
 
+    /** Index of the first step the player can still go back to. */
+    get minStepIndex() {
+        return this.mode === "create" && this.built ? CREATE_STEPS.length : 0;
+    }
+
+    /** Are we past the point where the character exists and each step writes to it immediately? */
+    get inSetupPhase() {
+        return this.mode === "setup" || (this.mode === "create" && this.built && this.stepIndex >= CREATE_STEPS.length);
+    }
+
     get classSystem() {
-        return this.mode === "levelup" ? this.actor.class?._source.system : this.docs.class?._source.system;
+        if (this.mode === "create") return this.docs.class?._source.system;
+        return this.actor?.class?._source.system;
+    }
+
+    get classSlug() {
+        if (this.mode === "create") return this.entries.class ? slugOf(this.entries.class) : null;
+        return this.actor?.class?.slug ?? null;
+    }
+
+    get casterConfig() {
+        if (!this.classSystem?.spellcasting) return null;
+        return SPELLCASTERS[this.classSlug] ?? null;
+    }
+
+    get spellLevel() {
+        return this.mode === "levelup" ? this.target : (this.actor?.level ?? 1);
+    }
+
+    get levelUpHasSpells() {
+        const cfg = this.mode === "levelup" ? this.casterConfig : null;
+        if (!cfg) return false;
+        const plan = spellPlan(cfg.casting, this.target);
+        return plan.groups.length > 0;
     }
 
     get hasSkillIncrease() {
@@ -174,11 +268,38 @@ export class CharacterCreatorApp extends ApplicationV2 {
 
     get featSlots() {
         const system = this.classSystem;
-        if (!system) return [];
+        if (!system || this.mode === "setup") return [];
         const slots = featSlotsAtLevel(system, this.target);
         if (this.mode === "create") return slots;
         const filled = new Set(this.actor.itemTypes.feat.map((f) => f.system.location));
         return slots.filter((slot) => !filled.has(slot.id));
+    }
+
+    /* Equipment */
+
+    get credits() {
+        return game.settings.get(MODULE_ID, "startingCredits");
+    }
+
+    get cartLines() {
+        return [...this.cart.values()].map(({ entry, units }) => ({
+            entry,
+            units,
+            price: entry.system.price,
+            cost: lineCost(entry.system.price, units),
+        }));
+    }
+
+    get spent() {
+        return cartTotal(this.cartLines);
+    }
+
+    get remaining() {
+        return this.credits - this.spent;
+    }
+
+    get visibleShopItems() {
+        return this.shopItems.filter((e) => shopCategory(e.type) === this.shopCategory);
     }
 
     #stepComplete(id) {
@@ -195,11 +316,24 @@ export class CharacterCreatorApp extends ApplicationV2 {
                 return this.mode === "levelup" ? !!this.lu.skill : this.skillPicks.size === this.skillInfo.total;
             case "feats":
                 return this.featSlots.every((slot) => this.featPicks[slot.id]);
+            case "spells":
+                return this.#spellsComplete();
             case "review":
                 return this.mode === "levelup" || this.name.trim().length > 0;
             default:
                 return true;
         }
+    }
+
+    #spellsComplete() {
+        const sp = this.spell;
+        if (!sp) return false;
+        if (!sp.tradition) return false;
+        return sp.plan.groups.every((group) => {
+            const picked = this.spellPicks[group.key]?.length ?? 0;
+            const available = (sp.candidates[group.key]?.length ?? 0) + picked;
+            return picked >= Math.min(group.count, available);
+        });
     }
 
     /** Drop any picks that no longer make sense after an upstream change. */
@@ -219,7 +353,7 @@ export class CharacterCreatorApp extends ApplicationV2 {
 
     async _prepareContext() {
         const id = this.stepId;
-        if (this.mode === "create") {
+        if (this.mode === "create" && !this.built) {
             if (id === "ancestry") this.lists.ancestry = await loadIndex("ancestry");
             if (id === "heritage" && this.entries.ancestry) {
                 this.lists.heritage = await heritagesFor(this.entries.ancestry);
@@ -230,22 +364,134 @@ export class CharacterCreatorApp extends ApplicationV2 {
             if (id === "class") this.lists.class = await loadIndex("class");
         }
         if (id === "feats") await this.#computeCandidates();
+        if (id === "spells") await this.#prepareSpells();
+        if (id === "equipment") await this.#prepareShop();
         return {};
+    }
+
+    /** Gather everything about the character-in-progress that feat prerequisites can refer to. */
+    async #prereqContext() {
+        const knownNames = await loadKnownNames(normalizeName);
+        const skills = new Set(Object.keys(CONFIG.PF2E.skills));
+        const skillRanks = {};
+        let mods;
+        const owned = new Set();
+        const addName = (name) => name && owned.add(normalizeName(name));
+
+        if (this.mode === "create") {
+            for (const slug of this.skillInfo.fixed.keys()) skillRanks[slug] = 1;
+            for (const slug of this.skillPicks) skillRanks[slug] = 1;
+            skillRanks.perception = this.classSystem?.perception ?? 1;
+            mods = this.validation.mods;
+            for (const kind of ["ancestry", "heritage", "background", "class"]) addName(this.entries[kind]?.name);
+            for (const doc of [this.docs.ancestry, this.docs.background, this.docs.class]) {
+                for (const item of Object.values(doc?._source.system.items ?? {})) {
+                    if (!item.level || item.level <= this.target) addName(item.name);
+                }
+            }
+        } else {
+            for (const option of this.skillOptions) skillRanks[option.key] = option.rank;
+            if (this.lu.skill) skillRanks[this.lu.skill] = (skillRanks[this.lu.skill] ?? 0) + 1;
+            skillRanks.perception = this.actor.perception?.rank ?? 0;
+            mods = { ...this.currentMods };
+            for (const attr of this.lu.boosts) mods[attr] = applyBoost(mods[attr]);
+            for (const item of this.actor.items) addName(item.name);
+        }
+        for (const pick of Object.values(this.featPicks)) addName(pick.name);
+
+        return { skills, skillRanks, mods, ownedNames: owned, knownNames };
     }
 
     async #computeCandidates() {
         const feats = await featIndex();
         const actor = this.actor;
         const ancestrySlug =
-            this.mode === "levelup" ? actor.ancestry?.slug : this.entries.ancestry ? slugOf(this.entries.ancestry) : null;
-        const classSlug = this.mode === "levelup" ? actor.class?.slug : this.entries.class ? slugOf(this.entries.class) : null;
+            this.mode === "create" ? (this.entries.ancestry ? slugOf(this.entries.ancestry) : null) : actor.ancestry?.slug;
+        const classSlug = this.classSlug;
         const ownedBase = (actor?.itemTypes.feat ?? []).map((f) => f.slug);
+        const context = await this.#prereqContext();
+
+        this.candidates = {};
         for (const slot of this.featSlots) {
             const others = Object.entries(this.featPicks)
                 .filter(([id]) => id !== slot.id)
                 .map(([, entry]) => slugOf(entry));
-            const context = { ancestrySlug, classSlug, allowRare: this.allowRare, ownedSlugs: new Set([...ownedBase, ...others]) };
-            this.candidates[slot.id] = feats.filter((entry) => isFeatEligible(entry, slot, context));
+            const filter = { ancestrySlug, classSlug, allowRare: this.allowRare, ownedSlugs: new Set([...ownedBase, ...others]) };
+            this.candidates[slot.id] = feats.filter((entry) => isFeatEligible(entry, slot, filter));
+        }
+
+        // Prerequisites: a pick that stopped qualifying (after going back and changing something) is dropped
+        this.prereqStatus = {};
+        for (const list of Object.values(this.candidates)) {
+            for (const entry of list) {
+                this.prereqStatus[entry.uuid] ??= evaluatePrerequisites(prerequisiteText(entry), context);
+            }
+        }
+        for (const [slotId, pick] of Object.entries(this.featPicks)) {
+            if (this.prereqStatus[pick.uuid]?.status === "unmet") delete this.featPicks[slotId];
+        }
+    }
+
+    async #prepareSpells() {
+        const cfg = this.casterConfig;
+        const actor = this.actor;
+        if (!cfg || !actor) {
+            this.spell = null;
+            return;
+        }
+
+        const feature = actor.itemTypes.feat.find((f) => f.system.traits?.otherTags?.includes(cfg.tag)) ?? null;
+        const tradition = this.traditionOverride ?? cfg.fixedTradition ?? traditionFromRules(feature?._source.system.rules);
+        const plan = spellPlan(cfg.casting, this.spellLevel);
+        const grantedMap = feature ? parseGrantedSpells(feature._source.system.description.value) : {};
+
+        const granted = [];
+        for (const rank of plan.granted) {
+            const uuid = grantedMap[rank];
+            if (!uuid) continue;
+            let doc = null;
+            try {
+                doc = await getDoc(uuid);
+            } catch (error) {
+                console.debug(`${MODULE_ID} | Granted spell ${uuid} is not available`, error);
+            }
+            granted.push({ rank, uuid, name: doc?.name ?? decodeURIComponent(uuid.split(".").pop()), img: doc?.img ?? null, missing: !doc });
+        }
+
+        const ownedKeys = new Set(
+            actor.itemTypes.spell.map((s) => {
+                const rank = s.system.traits.value.includes("cantrip") ? 0 : (s.system.location?.heightenedLevel ?? s.system.level.value);
+                return `${spellKey(s.name)}@${rank}`;
+            }),
+        );
+        for (const g of granted) if (!g.missing) ownedKeys.add(`${spellKey(g.name)}@${g.rank}`);
+
+        const spells = await loadIndex("spell");
+        const candidates = {};
+        if (tradition) {
+            for (const group of plan.groups) {
+                const rank = group.rank === "any" ? Math.min(this.anyRank, group.maxRank) : group.rank;
+                const taken = new Set(ownedKeys);
+                for (const [key, picks] of Object.entries(this.spellPicks)) {
+                    if (key === group.key) continue;
+                    for (const p of picks) taken.add(`${spellKey(p.entry.name)}@${p.rank}`);
+                }
+                candidates[group.key] = spells.filter((e) => isSpellEligible(e, { tradition, rank, allowRare: this.allowRare, taken, exact: cfg.casting === "prepared" }));
+            }
+        }
+
+        this.spell = { cfg, feature, tradition, plan, granted, candidates };
+        // Keep only picks that still fit their group
+        for (const key of Object.keys(this.spellPicks)) {
+            if (!plan.groups.some((g) => g.key === key)) delete this.spellPicks[key];
+        }
+    }
+
+    async #prepareShop() {
+        if (!this.shopItems.length) {
+            const items = await loadIndex("equipment");
+            const options = { maxLevel: game.settings.get(MODULE_ID, "startingItemLevel"), allowRare: this.allowRare };
+            this.shopItems = items.filter((entry) => isStarterItem(entry, options));
         }
     }
 
@@ -255,17 +501,17 @@ export class CharacterCreatorApp extends ApplicationV2 {
         const nav = ids
             .map((id, i) => {
                 const done = i < this.stepIndex && this.#stepComplete(id);
+                const canJump = i < this.stepIndex && i >= this.minStepIndex;
                 return `<li class="${i === this.stepIndex ? "current" : ""} ${done ? "done" : ""}"
-                    ${i < this.stepIndex ? `data-action="goto" data-index="${i}"` : ""}>
+                    ${canJump ? `data-action="goto" data-index="${i}"` : ""}>
                     <span class="num">${done ? '<i class="fa-solid fa-check"></i>' : i + 1}</span>
                     <span>${esc(t(`Step.${id}`))}</span></li>`;
             })
             .join("");
 
         const view = STEP_VIEWS[current](this);
-        const isLast = this.stepIndex === ids.length - 1;
+        const primary = this.#primary();
         const canNext = this.#stepComplete(current) && !this.busy;
-        const nextLabel = isLast ? (this.mode === "create" ? t("CreateCharacter") : t("ApplyLevelUp")) : t("Next");
 
         return `
         <div class="sf2e-cc-shell ${DETAIL_STEPS.has(current) ? "with-detail" : ""}">
@@ -277,12 +523,27 @@ export class CharacterCreatorApp extends ApplicationV2 {
             <aside class="sf2e-cc-detail"><div class="sf2e-cc-detail-body">
                 <p class="sf2e-cc-empty">${esc(t("DetailPlaceholder"))}</p></div></aside>
             <footer>
-                <button type="button" data-action="back" ${this.stepIndex === 0 || this.busy ? "disabled" : ""}>
+                <button type="button" data-action="back" ${this.stepIndex <= this.minStepIndex || this.busy ? "disabled" : ""}>
                     <i class="fa-solid fa-chevron-left"></i> ${esc(t("Back"))}</button>
-                <button type="button" class="primary" data-action="${isLast ? "finish" : "next"}" ${canNext ? "" : "disabled"}>
-                    ${esc(nextLabel)} <i class="fa-solid ${isLast ? "fa-rocket" : "fa-chevron-right"}"></i></button>
+                <button type="button" class="primary" data-action="${primary.action}" ${canNext ? "" : "disabled"}>
+                    ${esc(primary.label)} <i class="fa-solid ${primary.icon}"></i></button>
             </footer>
         </div>`;
+    }
+
+    /** What the main footer button does on the current step. */
+    #primary() {
+        const id = this.stepId;
+        const last = this.stepIndex === this.steps.length - 1;
+        if (this.mode === "create" && id === "review" && !this.built) {
+            return { action: "build", label: t("CreateCharacter"), icon: "fa-hammer" };
+        }
+        if (this.inSetupPhase) {
+            const label = last ? t("Finish") : id === "spells" ? t("AddSpells") : t("Next");
+            return { action: "setup-next", label, icon: last ? "fa-rocket" : "fa-chevron-right" };
+        }
+        if (last) return { action: "finish", label: t("ApplyLevelUp"), icon: "fa-rocket" };
+        return { action: "next", label: t("Next"), icon: "fa-chevron-right" };
     }
 
     _replaceHTML(result, content) {
@@ -317,10 +578,16 @@ export class CharacterCreatorApp extends ApplicationV2 {
             }
         });
         el.addEventListener("change", async (event) => {
-            if (!event.target.matches('[data-action="toggle-rare"]')) return;
-            this.allowRare = event.target.checked;
-            await game.settings.set(MODULE_ID, "allowRare", this.allowRare);
-            this.render();
+            const action = event.target.dataset?.action;
+            if (action === "toggle-rare") {
+                this.allowRare = event.target.checked;
+                await game.settings.set(MODULE_ID, "allowRare", this.allowRare);
+                this.shopItems = [];
+                this.render();
+            } else if (action === "toggle-unqualified") {
+                this.showUnqualified = event.target.checked;
+                this.render();
+            }
         });
     }
 
@@ -371,6 +638,13 @@ export class CharacterCreatorApp extends ApplicationV2 {
     /*  Events                                      */
     /* -------------------------------------------- */
 
+    #go(index) {
+        this.stepIndex = Math.max(this.minStepIndex, Math.min(index, this.steps.length - 1));
+        this.searchText = "";
+        this.detailUuid = null;
+        return this.render();
+    }
+
     async #onClick(event) {
         const target = event.target.closest("[data-action]");
         if (!target || target.disabled || target.matches("input")) return;
@@ -378,19 +652,15 @@ export class CharacterCreatorApp extends ApplicationV2 {
 
         switch (data.action) {
             case "next":
-                this.stepIndex = Math.min(this.stepIndex + 1, this.steps.length - 1);
-                this.searchText = "";
-                this.detailUuid = null;
-                return this.render();
+                return this.#go(this.stepIndex + 1);
             case "back":
-                this.stepIndex = Math.max(0, this.stepIndex - 1);
-                this.searchText = "";
-                this.detailUuid = null;
-                return this.render();
+                return this.#go(this.stepIndex - 1);
             case "goto":
-                this.stepIndex = Number(data.index);
-                this.searchText = "";
-                return this.render();
+                return this.#go(Number(data.index));
+            case "build":
+                return this.#build();
+            case "setup-next":
+                return this.#setupNext();
             case "finish":
                 return this.#finish();
             case "detail":
@@ -408,10 +678,10 @@ export class CharacterCreatorApp extends ApplicationV2 {
             case "feat": {
                 const entry = this.candidates[data.slot]?.find((e) => e.uuid === data.uuid);
                 if (!entry) return;
+                if (this.prereqStatus[entry.uuid]?.status === "unmet") return;
                 if (this.featPicks[data.slot]?.uuid === data.uuid) delete this.featPicks[data.slot];
                 else this.featPicks[data.slot] = entry;
                 this.detailUuid = data.uuid;
-                await this.#computeCandidates();
                 return this.render();
             }
             case "lu-boost": {
@@ -423,6 +693,26 @@ export class CharacterCreatorApp extends ApplicationV2 {
             }
             case "lu-skill":
                 this.lu.skill = this.lu.skill === data.skill ? null : data.skill;
+                return this.render();
+            case "tradition":
+                this.traditionOverride = data.tradition;
+                this.spellPicks = {};
+                return this.render();
+            case "spell-rank":
+                this.anyRank = Number(data.rank);
+                return this.render();
+            case "spell":
+                return this.#toggleSpell(data);
+            case "shop-category":
+                this.shopCategory = data.category;
+                this.searchText = "";
+                return this.render();
+            case "shop-add":
+                return this.#cartAdd(data.uuid);
+            case "shop-sub":
+                return this.#cartSub(data.uuid);
+            case "shop-remove":
+                this.cart.delete(data.uuid);
                 return this.render();
         }
     }
@@ -467,24 +757,130 @@ export class CharacterCreatorApp extends ApplicationV2 {
         this.render();
     }
 
-    async #finish() {
-        if (this.busy) return;
+    #toggleSpell({ group, uuid, rank }) {
+        const entry = this.spell?.candidates[group]?.find((e) => e.uuid === uuid);
+        const plan = this.spell?.plan.groups.find((g) => g.key === group);
+        if (!entry || !plan) return;
+        const list = (this.spellPicks[group] ??= []);
+        const r = Number(rank);
+        const i = list.findIndex((p) => p.entry.uuid === uuid && p.rank === r);
+        if (i >= 0) list.splice(i, 1);
+        else if (list.length < plan.count) list.push({ entry, rank: r });
+        this.detailUuid = uuid;
+        return this.render();
+    }
+
+    #cartAdd(uuid) {
+        const entry = this.shopItems.find((e) => e.uuid === uuid);
+        if (!entry) return;
+        const cost = lineCost(entry.system.price, 1);
+        if (cost > this.remaining) {
+            ui.notifications.warn(t("Shop.CannotAfford", { name: entry.name }));
+            return;
+        }
+        const line = this.cart.get(uuid) ?? { entry, units: 0 };
+        line.units += 1;
+        this.cart.set(uuid, line);
+        return this.render();
+    }
+
+    #cartSub(uuid) {
+        const line = this.cart.get(uuid);
+        if (!line) return;
+        line.units -= 1;
+        if (line.units <= 0) this.cart.delete(uuid);
+        return this.render();
+    }
+
+    /* -------------------------------------------- */
+    /*  Writing to the actor                        */
+    /* -------------------------------------------- */
+
+    async #run(work) {
+        if (this.busy) return false;
         this.busy = true;
         this.render();
         try {
-            const actor = this.mode === "create" ? await applyCreation(this) : await applyLevelUp(this);
-            ui.notifications.info(
-                this.mode === "create"
-                    ? t("Created", { name: actor.name })
-                    : t("LeveledUp", { name: actor.name, level: this.target }),
-            );
-            await this.close();
-            actor.sheet.render(true);
+            await work();
+            return true;
         } catch (error) {
             console.error(`${MODULE_ID} |`, error);
             ui.notifications.error(t("ApplyFailed", { message: error.message }));
+            return false;
+        } finally {
             this.busy = false;
-            this.render();
         }
+    }
+
+    async #closeAndShow() {
+        const actor = this.actor;
+        await this.close();
+        actor?.sheet.render(true);
+    }
+
+    /** Create the character, then move on to the setup steps (spells, equipment). */
+    async #build() {
+        const ok = await this.#run(async () => {
+            this.actor = await applyCreation(this);
+            this.built = true;
+            await setPendingSetup(this.actor, this.plannedSetup);
+            ui.notifications.info(t("Created", { name: this.actor.name }));
+        });
+        if (!ok) return this.render();
+        this.#go(CREATE_STEPS.length);
+    }
+
+    async #setupNext() {
+        const id = this.stepId;
+        const last = this.stepIndex === this.steps.length - 1;
+        const ok = await this.#run(async () => {
+            if (id === "spells") await this.#commitSpells();
+            if (id === "equipment") await this.#commitPurchases();
+            await completeSetupStep(this.actor, id);
+        });
+        if (!ok) return this.render();
+        if (last) return this.#closeAndShow();
+        this.#go(this.stepIndex + 1);
+    }
+
+    async #commitSpells() {
+        const sp = this.spell;
+        if (!sp?.tradition) throw new Error(t("Spells.NoTradition"));
+        const spells = [
+            ...sp.granted.filter((g) => !g.missing).map((g) => ({ uuid: g.uuid, rank: g.rank })),
+            ...Object.values(this.spellPicks)
+                .flat()
+                .map((p) => ({ uuid: p.entry.uuid, rank: p.rank })),
+        ];
+        await applySpells({
+            actor: this.actor,
+            casting: sp.cfg.casting,
+            tradition: sp.tradition,
+            level: this.spellLevel,
+            spells,
+        });
+    }
+
+    async #commitPurchases() {
+        const cart = this.cartLines.map((l) => ({ uuid: l.entry.uuid, price: l.price, units: l.units }));
+        await applyPurchases(this.actor, cart, this.credits);
+    }
+
+    async #finish() {
+        const ok = await this.#run(async () => {
+            await applyLevelUp(this);
+            if (this.stepsInclude("spells")) {
+                // The class feature just granted may have changed what spells are available; re-read it
+                await this.#prepareSpells();
+                await this.#commitSpells();
+            }
+            ui.notifications.info(t("LeveledUp", { name: this.actor.name, level: this.target }));
+        });
+        if (!ok) return this.render();
+        return this.#closeAndShow();
+    }
+
+    stepsInclude(id) {
+        return this.steps.includes(id);
     }
 }

@@ -2,7 +2,16 @@
  * HTML renderers for each wizard step. They are pure string builders over a read-only look at the app,
  * so the app can swap them into the window with a single innerHTML assignment.
  */
-import { ATTRIBUTES, prerequisiteText, hasAttributeBoosts, hitPointsPerLevel, canIncreaseSkill } from "../lib/rules.mjs";
+import {
+    ATTRIBUTES,
+    canIncreaseSkill,
+    hasAttributeBoosts,
+    hitPointsPerLevel,
+    lineCost,
+    prerequisiteText,
+    purchaseUnit,
+    shopCategory,
+} from "../lib/rules.mjs";
 
 export const esc = (value) =>
     String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -249,42 +258,214 @@ function viewLevelUpSkills(app) {
 /*  Feats                                       */
 /* -------------------------------------------- */
 
+function featRow(app, slot, entry, picked) {
+    const status = app.prereqStatus[entry.uuid] ?? { status: "met", unmet: [], unknown: [] };
+    const blocked = status.status === "unmet";
+    const prereq = prerequisiteText(entry);
+    const actions = entry.system?.actionType?.value;
+    const note = blocked
+        ? `<span class="sf2e-cc-prereq unmet"><i class="fa-solid fa-lock"></i> ${esc(t("Requires"))}: ${esc(status.unmet.join("; "))}</span>`
+        : status.status === "unknown"
+          ? `<span class="sf2e-cc-prereq unknown"><i class="fa-solid fa-circle-question"></i> ${esc(t("VerifyPrereq"))}: ${esc(status.unknown.join("; "))}</span>`
+          : prereq.length
+            ? `<span class="sf2e-cc-prereq met"><i class="fa-solid fa-check"></i> ${esc(t("Prerequisites"))}: ${esc(prereq.join("; "))}</span>`
+            : "";
+    return `<div class="sf2e-cc-feat ${picked?.uuid === entry.uuid ? "selected" : ""} ${blocked ? "blocked" : ""}"
+        ${blocked ? 'aria-disabled="true"' : `data-action="feat" tabindex="0"`} data-slot="${esc(slot.id)}"
+        data-uuid="${esc(entry.uuid)}" data-search="${esc(entry.name.toLowerCase())}">
+        <img src="${esc(entry.img)}" alt="" loading="lazy">
+        <div><strong>${esc(entry.name)}</strong> ${rarityBadge(entry)}
+            <span class="sf2e-cc-meta">${esc(t("LevelShort"))} ${esc(entry.system?.level?.value ?? 0)}${
+                actions && actions !== "passive" ? " · " + esc(actions) : ""
+            }</span>${note}
+        </div>
+        <button type="button" class="sf2e-cc-icon" data-action="detail" data-uuid="${esc(entry.uuid)}"
+            data-tooltip="${esc(t("Details"))}"><i class="fa-solid fa-circle-info"></i></button>
+    </div>`;
+}
+
 export function viewFeats(app) {
     if (!app.featSlots.length) return `<p class="sf2e-cc-empty">${esc(t("NoFeats"))}</p>`;
-    const rareToggle = `<label class="sf2e-cc-toggle"><input type="checkbox" data-action="toggle-rare" ${app.allowRare ? "checked" : ""}>
-        ${esc(t("ShowRare"))}</label>`;
+    const toggles = `<div class="sf2e-cc-toggles">
+        <label class="sf2e-cc-toggle"><input type="checkbox" data-action="toggle-rare" ${app.allowRare ? "checked" : ""}>
+            ${esc(t("ShowRare"))}</label>
+        <label class="sf2e-cc-toggle"><input type="checkbox" data-action="toggle-unqualified" ${app.showUnqualified ? "checked" : ""}>
+            ${esc(t("ShowUnqualified"))}</label></div>`;
     const sections = app.featSlots
         .map((slot) => {
             const picked = app.featPicks[slot.id];
-            const candidates = app.candidates[slot.id] ?? [];
-            const rows = candidates
-                .map((entry) => {
-                    const prereq = prerequisiteText(entry);
-                    const actions = entry.system?.actionType?.value;
-                    return `<div class="sf2e-cc-feat ${picked?.uuid === entry.uuid ? "selected" : ""}" data-action="feat" data-slot="${esc(slot.id)}"
-                        data-uuid="${esc(entry.uuid)}" data-search="${esc(entry.name.toLowerCase())}" tabindex="0">
-                        <img src="${esc(entry.img)}" alt="" loading="lazy">
-                        <div><strong>${esc(entry.name)}</strong> ${rarityBadge(entry)}
-                            <span class="sf2e-cc-meta">${esc(t("LevelShort"))} ${esc(entry.system?.level?.value ?? 0)}${
-                                actions && actions !== "passive" ? " · " + esc(actions) : ""
-                            }</span>
-                            ${prereq.length ? `<span class="sf2e-cc-prereq">${esc(t("Prerequisites"))}: ${esc(prereq.join("; "))}</span>` : ""}
-                        </div>
-                        <button type="button" class="sf2e-cc-icon" data-action="detail" data-uuid="${esc(entry.uuid)}"
-                            data-tooltip="${esc(t("Details"))}"><i class="fa-solid fa-circle-info"></i></button>
-                    </div>`;
-                })
-                .join("");
+            const all = app.candidates[slot.id] ?? [];
+            const blockedCount = all.filter((e) => app.prereqStatus[e.uuid]?.status === "unmet").length;
+            const shown = app.showUnqualified ? all : all.filter((e) => app.prereqStatus[e.uuid]?.status !== "unmet");
+            const rows = shown.map((entry) => featRow(app, slot, entry, picked)).join("");
             return `<section class="sf2e-cc-slot" data-slot="${esc(slot.id)}">
                 <h3>${esc(t(`Slot.${slot.category}`))} <small>${esc(t("LevelShort"))} ${slot.level}</small>
                     ${picked ? `<span class="sf2e-cc-picked">${esc(picked.name)}</span>` : `<span class="sf2e-cc-needed">${esc(t("ChooseOne"))}</span>`}</h3>
                 <div class="sf2e-cc-search"><i class="fa-solid fa-magnifying-glass"></i>
                     <input type="search" data-search-target='.sf2e-cc-feat[data-slot="${esc(slot.id)}"]' placeholder="${esc(t("Search"))}"></div>
                 <div class="sf2e-cc-list">${rows || `<p class="sf2e-cc-empty">${esc(t("NoResults"))}</p>`}</div>
+                ${blockedCount && !app.showUnqualified ? `<p class="sf2e-cc-meta">${esc(t("HiddenUnqualified", { n: blockedCount }))}</p>` : ""}
             </section>`;
         })
         .join("");
-    return `${rareToggle}${sections}`;
+    return `${toggles}${sections}`;
+}
+
+/* -------------------------------------------- */
+/*  Spells                                      */
+/* -------------------------------------------- */
+
+const rankName = (rank) => (rank === 0 ? t("Spells.Cantrips") : t("Spells.RankN", { n: rank }));
+
+function spellRow(group, entry, rank, picked) {
+    const isPicked = picked.some((p) => p.entry.uuid === entry.uuid && p.rank === rank);
+    const time = entry.system?.time?.value;
+    const heightened = rank > 0 && rank > (entry.system?.level?.value ?? rank);
+    return `<div class="sf2e-cc-feat ${isPicked ? "selected" : ""}" data-action="spell" tabindex="0" data-group="${esc(group.key)}"
+        data-uuid="${esc(entry.uuid)}" data-rank="${rank}" data-search="${esc(entry.name.toLowerCase())}">
+        <img src="${esc(entry.img)}" alt="" loading="lazy">
+        <div><strong>${esc(entry.name)}</strong> ${rarityBadge(entry)}
+            <span class="sf2e-cc-meta">${esc(rank === 0 ? t("Spells.Cantrip") : t("Spells.RankN", { n: entry.system?.level?.value ?? rank }))}${
+                heightened ? ` → ${esc(t("Spells.RankN", { n: rank }))}` : ""
+            }${time ? ` · ${esc(time)}` : ""}</span></div>
+        <button type="button" class="sf2e-cc-icon" data-action="detail" data-uuid="${esc(entry.uuid)}"
+            data-tooltip="${esc(t("Details"))}"><i class="fa-solid fa-circle-info"></i></button>
+    </div>`;
+}
+
+export function viewSpells(app) {
+    const sp = app.spell;
+    if (!sp) return `<p class="sf2e-cc-empty">${esc(t("Spells.NotACaster"))}</p>`;
+
+    const casting = t(`Casting.${sp.cfg.casting}`);
+    const source = sp.feature ? `${esc(sp.feature.name)} · ` : "";
+    const header = `<div class="sf2e-cc-spellhead"><strong>${source}${esc(sp.tradition ? t(`Tradition.${sp.tradition}`) : t("Spells.UnknownTradition"))}</strong>
+        <span>${esc(casting)}</span></div>
+        <p class="sf2e-cc-help">${esc(t(`Spells.Help.${sp.cfg.casting}`))}</p>`;
+
+    if (!sp.tradition) {
+        const chips = ["arcane", "divine", "occult", "primal"]
+            .map((tr) => `<button type="button" class="sf2e-cc-skill" data-action="tradition" data-tradition="${tr}">${esc(t(`Tradition.${tr}`))}</button>`)
+            .join("");
+        return `${header}<p class="sf2e-cc-errors">${esc(t("Spells.NoFeature", { feature: sp.cfg.feature }))}</p><div class="sf2e-cc-chips">${chips}</div>`;
+    }
+
+    const granted = sp.granted.length
+        ? `<section class="sf2e-cc-slot"><h3>${esc(t("Spells.Granted"))}</h3><ul class="sf2e-cc-list-plain">${sp.granted
+              .map(
+                  (g) => `<li>${g.img ? `<img src="${esc(g.img)}" alt="">` : '<i class="fa-solid fa-gift"></i>'}
+                    <span>${esc(g.name)} <small class="sf2e-cc-meta">${esc(rankName(g.rank))}${
+                        g.missing ? ` · ${esc(t("Spells.MissingGranted"))}` : ""
+                    }</small></span></li>`,
+              )
+              .join("")}</ul></section>`
+        : "";
+
+    const rareToggle = `<label class="sf2e-cc-toggle"><input type="checkbox" data-action="toggle-rare" ${app.allowRare ? "checked" : ""}>
+        ${esc(t("ShowRare"))}</label>`;
+
+    const groups = sp.plan.groups
+        .map((group) => {
+            const picked = app.spellPicks[group.key] ?? [];
+            const rank = group.rank === "any" ? Math.min(app.anyRank, group.maxRank) : group.rank;
+            const list = sp.candidates[group.key] ?? [];
+            const rows = list.map((e) => spellRow(group, e, rank, picked)).join("");
+            const rankChips =
+                group.rank === "any"
+                    ? `<div class="sf2e-cc-rankchips">${Array.from({ length: group.maxRank }, (_, i) => i + 1)
+                          .map((r) => `<button type="button" class="sf2e-cc-skill ${r === rank ? "on" : ""}" data-action="spell-rank" data-rank="${r}">${esc(rankName(r))}</button>`)
+                          .join("")}</div>`
+                    : "";
+            const title = group.rank === "any" ? t("Spells.Any") : rankName(group.rank);
+            const pickedLabel = picked.map((p) => p.entry.name).join(", ");
+            return `<section class="sf2e-cc-slot">
+                <h3>${esc(title)} <small>${picked.length}/${group.count}</small>
+                    ${pickedLabel ? `<span class="sf2e-cc-picked">${esc(pickedLabel)}</span>` : `<span class="sf2e-cc-needed">${esc(t("Spells.ChooseN", { n: group.count }))}</span>`}</h3>
+                ${rankChips}
+                <div class="sf2e-cc-search"><i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" data-search-target='.sf2e-cc-feat[data-group="${esc(group.key)}"]' placeholder="${esc(t("Search"))}"></div>
+                <div class="sf2e-cc-list">${rows || `<p class="sf2e-cc-empty">${esc(t("NoResults"))}</p>`}</div>
+            </section>`;
+        })
+        .join("");
+
+    const none = sp.plan.groups.length === 0 ? `<p class="sf2e-cc-empty">${esc(t("Spells.NothingToChoose"))}</p>` : "";
+    return `${header}${granted}${rareToggle}${groups}${none}`;
+}
+
+/* -------------------------------------------- */
+/*  Equipment                                   */
+/* -------------------------------------------- */
+
+const SHOP_CATEGORIES = ["weapons", "armor", "shields", "gear", "consumables"];
+
+function bulkLabel(bulk) {
+    const v = bulk?.value ?? 0;
+    return v === 0 ? "—" : v < 1 ? "L" : String(v);
+}
+
+export function viewEquipment(app) {
+    const spent = app.spent;
+    const remaining = app.remaining;
+    const chips = SHOP_CATEGORIES.map((c) => {
+        const count = app.shopItems.filter((e) => shopCategory(e.type) === c).length;
+        return `<button type="button" class="sf2e-cc-skill ${c === app.shopCategory ? "on" : ""}" data-action="shop-category" data-category="${c}">
+            ${esc(t(`Shop.Category.${c}`))}<small>${count}</small></button>`;
+    }).join("");
+
+    const rows = app.visibleShopItems
+        .map((entry) => {
+            const cost = lineCost(entry.system.price, 1);
+            const unit = purchaseUnit(entry.system.price);
+            const afford = cost <= remaining;
+            const inCart = app.cart.get(entry.uuid)?.units ?? 0;
+            return `<div class="sf2e-cc-feat sf2e-cc-shopitem ${afford ? "" : "blocked"}" data-search="${esc(entry.name.toLowerCase())}" data-shop-item>
+                <img src="${esc(entry.img)}" alt="" loading="lazy">
+                <div><strong>${esc(entry.name)}</strong> ${rarityBadge(entry)}${unit > 1 ? ` <small>×${unit}</small>` : ""}
+                    <span class="sf2e-cc-meta">${esc(t("LevelShort"))} ${entry.system.level?.value ?? 0} · ${esc(t("Shop.Bulk"))} ${esc(bulkLabel(entry.system.bulk))}</span></div>
+                <span class="sf2e-cc-price">${cost} ${esc(t("Shop.Cr"))}</span>
+                <button type="button" class="sf2e-cc-buy" data-action="shop-add" data-uuid="${esc(entry.uuid)}" ${afford ? "" : "disabled"}
+                    data-tooltip="${esc(t("Shop.Add"))}"><i class="fa-solid fa-cart-plus"></i>${inCart ? ` <small>${inCart}</small>` : ""}</button>
+                <button type="button" class="sf2e-cc-icon" data-action="detail" data-uuid="${esc(entry.uuid)}"
+                    data-tooltip="${esc(t("Details"))}"><i class="fa-solid fa-circle-info"></i></button>
+            </div>`;
+        })
+        .join("");
+
+    const cart = app.cartLines.length
+        ? app.cartLines
+              .map(
+                  (l) => `<li><span class="name">${esc(l.entry.name)}${purchaseUnit(l.price) > 1 ? ` <small>×${purchaseUnit(l.price) * l.units}</small>` : ""}</span>
+                    <span class="qty"><button type="button" data-action="shop-sub" data-uuid="${esc(l.entry.uuid)}"><i class="fa-solid fa-minus"></i></button>
+                        ${l.units}
+                        <button type="button" data-action="shop-add" data-uuid="${esc(l.entry.uuid)}" ${lineCost(l.price, 1) > remaining ? "disabled" : ""}><i class="fa-solid fa-plus"></i></button></span>
+                    <span class="cost">${l.cost}</span>
+                    <button type="button" class="sf2e-cc-icon static" data-action="shop-remove" data-uuid="${esc(l.entry.uuid)}"
+                        data-tooltip="${esc(t("Shop.Remove"))}"><i class="fa-solid fa-trash"></i></button></li>`,
+              )
+              .join("")
+        : `<li class="sf2e-cc-empty">${esc(t("Shop.EmptyCart"))}</li>`;
+
+    return `
+    <div class="sf2e-cc-shop">
+        <div class="sf2e-cc-shop-list">
+            <div class="sf2e-cc-chips compact">${chips}</div>
+            <div class="sf2e-cc-search"><i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" data-search-target="[data-shop-item]" placeholder="${esc(t("Search"))}"></div>
+            <label class="sf2e-cc-toggle"><input type="checkbox" data-action="toggle-rare" ${app.allowRare ? "checked" : ""}> ${esc(t("ShowRare"))}</label>
+            <div class="sf2e-cc-list tall">${rows || `<p class="sf2e-cc-empty">${esc(t("NoResults"))}</p>`}</div>
+        </div>
+        <aside class="sf2e-cc-cart">
+            <h3>${esc(t("Shop.Cart"))}</h3>
+            <div class="sf2e-cc-wallet ${remaining < 0 ? "over" : ""}">
+                <div><span>${esc(t("Shop.Budget"))}</span><strong>${app.credits}</strong></div>
+                <div><span>${esc(t("Shop.Spent"))}</span><strong>${spent}</strong></div>
+                <div class="left"><span>${esc(t("Shop.Remaining"))}</span><strong>${remaining}</strong></div>
+            </div>
+            <ul class="sf2e-cc-cartlist">${cart}</ul>
+            <p class="sf2e-cc-help">${esc(t("Shop.Help", { level: game.settings.get("sf2e-character-creator", "startingItemLevel") }))}</p>
+        </aside>
+    </div>`;
 }
 
 /* -------------------------------------------- */
@@ -301,6 +482,7 @@ export function viewOverview(app) {
     if (hasAttributeBoosts(app.target)) todo.push(t("Todo.attributes"));
     if (app.hasSkillIncrease) todo.push(t("Todo.skillIncrease"));
     for (const slot of app.featSlots) todo.push(t(`Todo.feat.${slot.category}`));
+    if (app.levelUpHasSpells) todo.push(t("Todo.spells"));
     const hp = hitPointsPerLevel(app.classHp, app.currentMods.con);
     return `
         <div class="sf2e-cc-levelbanner"><span>${app.actor.level}</span><i class="fa-solid fa-arrow-right"></i><span class="next">${app.target}</span></div>
@@ -358,6 +540,8 @@ export const STEP_VIEWS = {
     attributes: viewAttributes,
     skills: viewSkills,
     feats: viewFeats,
+    spells: viewSpells,
+    equipment: viewEquipment,
     overview: viewOverview,
     review: viewReview,
 };

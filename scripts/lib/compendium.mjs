@@ -12,6 +12,10 @@ const PACKS = {
     background: "sf2e.backgrounds",
     class: "sf2e.classes",
     feat: "sf2e.feats",
+    spell: "sf2e.spells",
+    equipment: "sf2e.equipment",
+    classfeature: "sf2e.class-features",
+    ancestryfeature: "sf2e.ancestry-features",
 };
 
 const INDEX_FIELDS = {
@@ -42,6 +46,18 @@ const INDEX_FIELDS = {
         "system.publication",
         "system.maxTakable",
     ],
+    spell: ["system.level", "system.slug", "system.traits", "system.time", "system.range", "system.publication"],
+    equipment: [
+        "system.level",
+        "system.price",
+        "system.bulk",
+        "system.traits",
+        "system.category",
+        "system.group",
+        "system.publication",
+    ],
+    classfeature: [],
+    ancestryfeature: [],
 };
 
 const cache = new Map();
@@ -86,6 +102,16 @@ export function featIndex() {
     return loadIndex("feat");
 }
 
+/** Normalized names of every feat, feature, and heritage in the system, for prerequisite checks. */
+let knownNames = null;
+export async function loadKnownNames(normalize) {
+    if (knownNames) return knownNames;
+    const kinds = ["feat", "classfeature", "ancestryfeature", "heritage"];
+    const lists = await Promise.all(kinds.map((kind) => loadIndex(kind)));
+    knownNames = new Set(lists.flat().map((entry) => normalize(entry.name)));
+    return knownNames;
+}
+
 /** Fetch full documents, caching by UUID so steps don't re-fetch. */
 const docCache = new Map();
 export async function getDoc(uuid) {
@@ -106,6 +132,7 @@ export async function sourceOf(uuid) {
 }
 
 export function clearCaches() {
+    knownNames = null;
     cache.clear();
     docCache.clear();
 }

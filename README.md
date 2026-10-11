@@ -18,7 +18,14 @@ character creation rules for you, so you cannot end up with an illegal build by 
 6. **Skills**: skills already trained by your class or background are marked; pick the rest
    (class additional skills + Intelligence modifier).
 7. **Feats**: ancestry and class feat slots that open at level 1, filtered to your ancestry and class.
+   Feats you don't meet the prerequisites for are hidden (or shown locked, with the reason).
 8. **Review**: name your character and create them.
+9. **Spells** (casters): choose your repertoire or spell database. The tradition and the free spells come from
+   the connection, paradox, or programming language you picked on the character sheet.
+10. **Equipment**: shop with 150 credits. Leftover credits go on the character.
+
+The character is created at step 8; spells and equipment are added to the finished character, so you can close the
+window and pick them up later (the sheet's header icon becomes **Finish Character Setup**).
 
 **Level up**
 
@@ -26,6 +33,7 @@ The wizard reads your class's own level tables, so it only asks for what that le
 
 - Overview of the HP and new class features you gain
 - Four attribute boosts at levels 5, 10, 15, and 20 (partial boosts shown on attributes at +4 or higher)
+- New spells for mystics, technomancers, and witchwarpers, including the free spell for each newly gained rank
 - Skill increases, capped by level (Expert at 3, Master at 7, Legendary at 15)
 - Ancestry, class, skill, and general feats for the slots that open at that level
 
@@ -38,8 +46,16 @@ The wizard reads your class's own level tables, so it only asks for what that le
 - Boosts to an attribute at +4 or higher count as half a step (matching the system's own calculation)
 - Skill increases respect the level requirement for each proficiency rank
 - Feats are filtered by slot type, level, and the character's ancestry/class traits
+- Feat prerequisites are checked against the character as built so far: skill ranks (including the skill you
+  are about to raise), attribute modifiers, and required feats, features, heritages, and dedications
+- Spells are limited to the class's tradition, the right rank, and common rarity; cantrips and ranked spells are
+  kept separate; how many you may learn follows the class's spell tables and repertoire/database text
+- Starting equipment is limited to 150 credits (configurable in module settings) and common items of level 1
+  or lower (also configurable)
 
-Prerequisites are shown on each feat but not automatically verified; the final call stays with you and your GM.
+Some prerequisites are free text that cannot be checked mechanically (for example "your lucky number" or
+"able to cast spells"). Those feats stay available with a "Check with your GM" note. Rare and uncommon feats,
+spells, and items are hidden unless you turn on the option.
 
 ## Installation
 
@@ -71,7 +87,11 @@ at runtime from the `sf2e` system's own compendiums (`sf2e.ancestries`, `sf2e.he
 ## Known limits
 
 - Voluntary flaws, alternate ancestry boosts, Free Archetype, and other variant rules are not yet supported.
-- Starting equipment and spell selection are left to the character sheet.
+- Spell support covers the mystic, technomancer, and witchwarper. Focus spells (epiphany spells, warp spells, magic
+  hacks) are left to the sheet, as are daily spell preparation and any 10th-rank spell slot.
+- The system's spell compendium is still growing: some spells a connection, paradox, or programming language
+  grants are not in it yet. The wizard lists them as missing so you can add them by hand.
+- Equipment is bought at character creation only (no in-game shopping), and nothing is equipped automatically.
 - Archetype and multiclass dedication feats are not offered in class feat slots.
 
 ## Development

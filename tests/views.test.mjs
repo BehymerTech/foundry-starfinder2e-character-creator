@@ -14,10 +14,17 @@ globalThis.foundry = {
     applications: { api: { ApplicationV2: FakeApplicationV2 }, ux: { TextEditor: { implementation: {} } } },
     utils: { randomID: () => "abcd", setProperty: () => {} },
 };
+const SETTINGS = { allowRare: false, startingCredits: 150, startingItemLevel: 1 };
+const SPELLS = [];
 globalThis.game = {
     i18n: { localize: (k) => k, format: (k) => k },
-    settings: { get: () => false },
+    settings: { get: (_module, key) => SETTINGS[key] },
+    packs: {
+        get: (id) => ({ getIndex: async () => new Map((id === "sf2e.spells" ? SPELLS : []).map((e) => [e.uuid, e])) }),
+    },
 };
+const DOCS = {};
+globalThis.fromUuid = async (uuid) => DOCS[uuid] ?? null;
 globalThis.CONFIG = {
     PF2E: {
         abilities: { str: "PF2E.AbilityStr" },
@@ -104,6 +111,7 @@ test("level-up mode builds its steps from the class tables", () => {
         level: 2,
         type: "character",
         uuid: "Actor.x",
+        getFlag: () => undefined,
         abilities: Object.fromEntries(["str", "dex", "con", "int", "wis", "cha"].map((a) => [a, { mod: 2 }])),
         class: {
             slug: "soldier",
@@ -135,4 +143,149 @@ test("level-up mode builds its steps from the class tables", () => {
     app.target = 5;
     assert.deepEqual(app.steps, ["overview", "attributes", "skills", "feats", "review"]);
     assert.ok(STEP_VIEWS.attributes(app).includes("lu-boost"));
+});
+
+/* -------------------------------------------- */
+/*  Spells, equipment, prerequisites             */
+/* -------------------------------------------- */
+
+test("setup steps follow the class: casters get spells, everyone gets equipment", () => {
+    const app = createApp();
+    assert.deepEqual(app.steps.slice(-1), ["equipment"]);
+
+    app.entries.class = entry("Mystic", { slug: "mystic" });
+    app.docs.class = doc({ ...app.docs.class._source.system, spellcasting: 1 });
+    assert.deepEqual(app.steps.slice(-2), ["spells", "equipment"]);
+    assert.equal(app.steps.indexOf("review"), 7);
+});
+
+test("the equipment shop tracks a 150 credit budget", () => {
+    const app = createApp();
+    const blaster = entry("Pistol", { level: { value: 0 }, price: { value: { sp: 60 } }, bulk: { value: 1 }, traits: { rarity: "common" } });
+    blaster.type = "weapon";
+    const vest = entry("Vest", { level: { value: 1 }, price: { value: { sp: 100 } }, bulk: { value: 1 }, traits: { rarity: "common" } });
+    vest.type = "armor";
+    app.shopItems = [blaster, vest];
+    app.shopCategory = "weapons";
+
+    assert.equal(app.credits, 150);
+    assert.equal(app.remaining, 150);
+    app.cart.set(blaster.uuid, { entry: blaster, units: 2 });
+    assert.equal(app.spent, 120);
+    assert.equal(app.remaining, 30);
+    const html = STEP_VIEWS.equipment(app);
+    assert.ok(html.includes("Pistol"));
+    assert.ok(!html.includes("Vest")); // different category tab
+    assert.ok(html.includes('data-action="shop-add"'));
+    assert.ok(!html.includes("undefined"));
+    app.shopCategory = "armor";
+    // 100 credits no longer fits in the 30 remaining
+    assert.ok(/shop-add[^>]*disabled/.test(STEP_VIEWS.equipment(app)));
+});
+
+function mysticActor() {
+    const connection = {
+        name: "Akashic",
+        system: { traits: { otherTags: ["mystic-connection"] } },
+        _source: {
+            system: {
+                rules: [{ key: "ActiveEffectLike", path: "flags.system.mystic.tradition", value: "occult" }],
+                description: {
+                    value: "<p>Connection Spells cantrip: @UUID[Compendium.sf2e.spells.Item.Scan Environment]; 1st: @UUID[Compendium.sf2e.spells.Item.Akashic Download]</p>",
+                },
+            },
+        },
+    };
+    DOCS["Compendium.sf2e.spells.Item.Scan Environment"] = { name: "Scan Environment", img: "s.webp" };
+    const spell = (name, level, traits) => ({
+        name,
+        uuid: `Compendium.sf2e.spells.Item.${name}`,
+        img: "s.webp",
+        system: { level: { value: level }, traits: { value: traits, traditions: ["occult"], rarity: "common" } },
+    });
+    SPELLS.length = 0;
+    SPELLS.push(
+        ...["Daze", "Message", "Shield", "Light", "Ghost Sound"].map((n) => spell(n, 1, ["cantrip"])),
+        ...["Fear", "Sleep", "Bless"].map((n) => spell(n, 1, [])),
+    );
+    return {
+        name: "Nova",
+        level: 1,
+        type: "character",
+        uuid: "Actor.n",
+        abilities: {},
+        getFlag: () => ["spells", "equipment"],
+        class: {
+            slug: "mystic",
+            system: { hp: 8 },
+            _source: { system: { spellcasting: 1, keyAbility: { value: ["wis"] } } },
+        },
+        itemTypes: { feat: [connection], spell: [], lore: [] },
+        items: [],
+    };
+}
+
+test("setup mode lists the planned spell choices for the chosen connection", async () => {
+    const app = new CharacterCreatorApp({ id: "t" }, mysticActor());
+    assert.equal(app.mode, "setup");
+    assert.deepEqual(app.steps, ["spells", "equipment"]);
+
+    await app._prepareContext();
+    assert.equal(app.spell.tradition, "occult");
+    assert.deepEqual(
+        app.spell.plan.groups.map((g) => [g.key, g.count]),
+        [
+            ["cantrip", 4],
+            ["rank-1", 2],
+        ],
+    );
+    assert.equal(app.spell.granted.length, 2);
+    assert.ok(app.spell.granted.find((g) => g.rank === 1).missing); // Akashic Download is not in the stub compendium
+    assert.equal(app.spell.candidates.cantrip.length, 5);
+    assert.equal(app.spell.candidates["rank-1"].length, 3);
+
+    const html = STEP_VIEWS.spells(app);
+    assert.ok(html.includes("Scan Environment") && html.includes("Akashic"));
+    assert.ok(!html.includes("undefined"));
+
+    // Not complete until every group is filled
+    const shell = await app._renderHTML();
+    assert.ok(/setup-next"\s+disabled/.test(shell));
+    app.spellPicks.cantrip = app.spell.candidates.cantrip.slice(0, 4).map((e) => ({ entry: e, rank: 0 }));
+    app.spellPicks["rank-1"] = app.spell.candidates["rank-1"].slice(0, 2).map((e) => ({ entry: e, rank: 1 }));
+    assert.ok(!/setup-next"\s+disabled/.test(await app._renderHTML()));
+});
+
+test("a caster whose connection cannot be found is asked for a tradition", async () => {
+    const actor = mysticActor();
+    actor.itemTypes.feat = [];
+    const app = new CharacterCreatorApp({ id: "t" }, actor);
+    await app._prepareContext();
+    assert.equal(app.spell.tradition, null);
+    assert.ok(STEP_VIEWS.spells(app).includes('data-action="tradition"'));
+    app.traditionOverride = "divine";
+    await app._prepareContext();
+    assert.equal(app.spell.tradition, "divine");
+});
+
+test("feats you don't qualify for are hidden or locked", () => {
+    const app = createApp();
+    const slot = app.featSlots[0];
+    const good = entry("Armor Ace", { level: { value: 1 }, prerequisites: { value: [] } });
+    const bad = entry("Master Thing", { level: { value: 1 }, prerequisites: { value: [{ value: "master in Athletics" }] } });
+    app.candidates = { [slot.id]: [good, bad] };
+    app.prereqStatus = {
+        [good.uuid]: { status: "met", unmet: [], unknown: [] },
+        [bad.uuid]: { status: "unmet", unmet: ["master in Athletics"], unknown: [] },
+    };
+
+    let html = STEP_VIEWS.feats(app);
+    assert.ok(html.includes("Armor Ace"));
+    assert.ok(!html.includes("Master Thing"));
+    assert.ok(html.includes("HiddenUnqualified"));
+
+    app.showUnqualified = true;
+    html = STEP_VIEWS.feats(app);
+    assert.ok(html.includes("Master Thing") && html.includes("master in Athletics"));
+    assert.ok(!new RegExp(`data-action="feat"[^>]*${bad.uuid}`).test(html.replace(/\s+/g, " ")));
 });

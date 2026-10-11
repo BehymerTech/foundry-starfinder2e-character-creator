@@ -514,6 +514,165 @@
     white-space: nowrap;
 }
 
+/* Prerequisites */
+.sf2e-cc .sf2e-cc-feat.blocked {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.sf2e-cc .sf2e-cc-feat.blocked:hover {
+    border-color: var(--cc-line);
+}
+.sf2e-cc .sf2e-cc-prereq.unmet {
+    color: var(--cc-bad);
+    opacity: 1;
+}
+.sf2e-cc .sf2e-cc-prereq.unknown {
+    color: var(--cc-accent);
+    opacity: 1;
+}
+.sf2e-cc .sf2e-cc-prereq.met {
+    color: var(--cc-ok);
+}
+.sf2e-cc .sf2e-cc-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+}
+
+/* Spells */
+.sf2e-cc .sf2e-cc-spellhead {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--cc-line);
+    border-left: 4px solid var(--cc-accent);
+    border-radius: 6px;
+    background: rgb(255 255 255 / 0.04);
+}
+.sf2e-cc .sf2e-cc-spellhead span {
+    opacity: 0.75;
+}
+.sf2e-cc .sf2e-cc-rankchips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0.25rem 0;
+}
+.sf2e-cc .sf2e-cc-rankchips .sf2e-cc-skill {
+    flex-direction: row;
+    padding: 0.2rem 0.6rem;
+}
+
+/* Equipment shop */
+.sf2e-cc .sf2e-cc-shop {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    gap: 1rem;
+    align-items: start;
+}
+.sf2e-cc .sf2e-cc-chips.compact {
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    margin-top: 0;
+}
+.sf2e-cc .sf2e-cc-list.tall {
+    max-height: none;
+}
+.sf2e-cc .sf2e-cc-shopitem {
+    align-items: center;
+}
+.sf2e-cc .sf2e-cc-shopitem > div {
+    flex: 1;
+    min-width: 0;
+}
+.sf2e-cc .sf2e-cc-price {
+    font-weight: 700;
+    white-space: nowrap;
+}
+.sf2e-cc .sf2e-cc-buy {
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.25rem 0.6rem;
+}
+.sf2e-cc .sf2e-cc-shopitem .sf2e-cc-icon {
+    position: static;
+}
+.sf2e-cc .sf2e-cc-cart {
+    position: sticky;
+    top: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--cc-line);
+    border-radius: 8px;
+    background: rgb(0 0 0 / 0.12);
+}
+.sf2e-cc .sf2e-cc-cart h3 {
+    margin: 0 0 0.5rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-wallet {
+    display: grid;
+    gap: 0.2rem;
+    margin-bottom: 0.5rem;
+}
+.sf2e-cc .sf2e-cc-wallet div {
+    display: flex;
+    justify-content: space-between;
+}
+.sf2e-cc .sf2e-cc-wallet .left {
+    padding-top: 0.2rem;
+    border-top: 1px solid var(--cc-line);
+    font-size: 1.1rem;
+    color: var(--cc-ok);
+}
+.sf2e-cc .sf2e-cc-wallet.over .left {
+    color: var(--cc-bad);
+}
+.sf2e-cc .sf2e-cc-cartlist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 18rem;
+    overflow-y: auto;
+}
+.sf2e-cc .sf2e-cc-cartlist li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--cc-line);
+}
+.sf2e-cc .sf2e-cc-cartlist li.sf2e-cc-empty {
+    display: block;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-cartlist .qty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.sf2e-cc .sf2e-cc-cartlist .qty button,
+.sf2e-cc .sf2e-cc-icon.static {
+    position: static;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+}
+.sf2e-cc .sf2e-cc-cartlist .cost {
+    font-weight: 700;
+    min-width: 2rem;
+    text-align: right;
+}
+
+@media (max-width: 1000px) {
+    .sf2e-cc .sf2e-cc-shop {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Actors directory button */
 .sf2e-cc-open {
     flex: 0 0 auto;

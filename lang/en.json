@@ -11,14 +11,20 @@
         "Created": "{name} has been created.",
         "LeveledUp": "{name} is now level {level}.",
         "ApplyFailed": "The character creator could not finish: {message}",
-
         "Settings": {
             "AllowRare": {
                 "Name": "Show uncommon and rare feats",
                 "Hint": "Include feats with the uncommon, rare, or unique rarity in the feat pickers. Check with your GM first."
+            },
+            "StartingCredits": {
+                "Name": "Starting credits",
+                "Hint": "Credits a new character has to spend on starting equipment in the character creator."
+            },
+            "StartingItemLevel": {
+                "Name": "Highest starting item level",
+                "Hint": "New characters may only buy common items of this level or lower in the character creator."
             }
         },
-
         "Back": "Back",
         "Next": "Next",
         "CreateCharacter": "Create Character",
@@ -46,7 +52,6 @@
         "ShowRare": "Show uncommon and rare options",
         "VersatileHeritages": "Versatile heritages",
         "NoHeritages": "This ancestry has no heritages in the compendium. You can continue.",
-
         "Step": {
             "ancestry": "Ancestry",
             "heritage": "Heritage",
@@ -56,7 +61,9 @@
             "skills": "Skills",
             "feats": "Feats",
             "review": "Review",
-            "overview": "Overview"
+            "overview": "Overview",
+            "spells": "Spells",
+            "equipment": "Equipment"
         },
         "StepHelp": {
             "ancestry": "Who are you? Your ancestry sets your hit points, size, speed, and the first of your attribute boosts.",
@@ -67,9 +74,10 @@
             "skills": "Choose the skills you are trained in.",
             "feats": "Pick the feats that open up at this level.",
             "review": "Make sure everything looks right, then finish.",
-            "overview": "Here is what advancing brings."
+            "overview": "Here is what advancing brings.",
+            "spells": "Choose the spells your class lets you learn.",
+            "equipment": "Spend your starting credits. Anything left over stays in your character's pocket."
         },
-
         "AttributesHelp": "Your ancestry, background, and class each grant boosts. Boosts from one source must go to different attributes. Then spend four free boosts on four different attributes. You cannot start above +4.",
         "FreeBoosts": "Free boosts ({n}/{max})",
         "Error": {
@@ -80,7 +88,6 @@
         },
         "LevelBoostsHelp": "Level {level} grants four attribute boosts, each to a different attribute. A boost to an attribute that is already +4 or higher only counts for half a step.",
         "PartialBoost": "Partial boost (counts as +½)",
-
         "SkillsHelp": "Choose {n} additional trained skills ({remaining} left). Skills already trained by your class or background are marked.",
         "LoreSkills": "Lore skills",
         "From": {
@@ -95,7 +102,6 @@
             "master": "Master",
             "legendary": "Legendary"
         },
-
         "Slot": {
             "ancestry": "Ancestry feat",
             "class": "Class feat",
@@ -103,7 +109,6 @@
             "general": "General feat"
         },
         "NoFeats": "No feats to choose here.",
-
         "YouGain": "You gain",
         "HpGain": "{hp} hit points ({classHp} from your class + {con} Constitution)",
         "ClassFeatures": "New class features",
@@ -119,12 +124,70 @@
                 "class": "A class feat",
                 "skill": "A skill feat",
                 "general": "A general feat"
-            }
+            },
+            "spells": "New spells"
         },
-
         "CharacterName": "Character name",
         "CharacterNamePlaceholder": "Name your hero",
         "ReviewCreateNote": "Finishing adds your choices to the character sheet. Some class features and feats may ask you to make further choices.",
-        "ReviewLevelNote": "Finishing raises your level and adds the choices above to your sheet."
+        "ReviewLevelNote": "Finishing raises your level and adds the choices above to your sheet.",
+        "FinishSetup": "Finish Character Setup",
+        "TitleSetup": "{name}: Spells and Gear",
+        "Finish": "Finish",
+        "AddSpells": "Add Spells",
+        "Requires": "Requires",
+        "VerifyPrereq": "Check with your GM",
+        "ShowUnqualified": "Show feats I don't qualify for",
+        "HiddenUnqualified": "{n} more hidden because you don't meet their prerequisites.",
+        "SpellEntryName": "{tradition} {casting} Spells",
+        "Casting": {
+            "spontaneous": "Spontaneous",
+            "prepared": "Prepared"
+        },
+        "Tradition": {
+            "arcane": "Arcane",
+            "divine": "Divine",
+            "occult": "Occult",
+            "primal": "Primal"
+        },
+        "Spells": {
+            "NotACaster": "This class does not cast spells.",
+            "UnknownTradition": "Unknown tradition",
+            "NoFeature": "Could not find your {feature} on the character. Choose your spell tradition manually.",
+            "NoTradition": "Choose a spell tradition first.",
+            "Granted": "Granted by your class",
+            "MissingGranted": "not in the compendium, add it from the sheet",
+            "Cantrips": "Cantrips",
+            "Cantrip": "Cantrip",
+            "RankN": "Rank {n}",
+            "Any": "Spells of any rank",
+            "ChooseN": "Choose {n}",
+            "NothingToChoose": "No new spells to choose at this level.",
+            "Help": {
+                "spontaneous": "You know these spells in your spell repertoire. You can cast any of them using a spell slot of the right rank, and a spell can be heightened by casting it in a higher-rank slot.",
+                "prepared": "These spells go into your spell database. Each morning you prepare the ones you will cast that day from your database."
+            }
+        },
+        "Shop": {
+            "OverBudget": "That is more than you can afford.",
+            "CannotAfford": "You can't afford {name}.",
+            "Category": {
+                "weapons": "Weapons",
+                "armor": "Armor",
+                "shields": "Shields",
+                "gear": "Gear",
+                "consumables": "Consumables"
+            },
+            "Bulk": "Bulk",
+            "Cr": "cr",
+            "Add": "Add to cart",
+            "Remove": "Remove",
+            "EmptyCart": "Nothing yet. Add items from the list.",
+            "Cart": "Your cart",
+            "Budget": "Starting credits",
+            "Spent": "Spent",
+            "Remaining": "Left over",
+            "Help": "New characters can buy common items up to level {level}. Leftover credits are added to your character."
+        }
     }
 }

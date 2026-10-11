@@ -1,5 +1,7 @@
 import { CharacterCreatorApp } from "./app/creator-app.mjs";
+import { getPendingSetup } from "./app/apply.mjs";
 import { MODULE_ID } from "./lib/compendium.mjs";
+import { STARTING_CREDITS, STARTING_ITEM_LEVEL } from "./lib/rules.mjs";
 
 const isSf2e = () => game.system.id === "sf2e";
 
@@ -11,6 +13,22 @@ Hooks.once("init", () => {
         config: true,
         type: Boolean,
         default: false,
+    });
+    game.settings.register(MODULE_ID, "startingCredits", {
+        name: "SF2ECC.Settings.StartingCredits.Name",
+        hint: "SF2ECC.Settings.StartingCredits.Hint",
+        scope: "world",
+        config: true,
+        type: new foundry.data.fields.NumberField({ required: true, integer: true, min: 0, initial: STARTING_CREDITS }),
+        default: STARTING_CREDITS,
+    });
+    game.settings.register(MODULE_ID, "startingItemLevel", {
+        name: "SF2ECC.Settings.StartingItemLevel.Name",
+        hint: "SF2ECC.Settings.StartingItemLevel.Hint",
+        scope: "world",
+        config: true,
+        type: new foundry.data.fields.NumberField({ required: true, integer: true, min: 0, max: 20, initial: STARTING_ITEM_LEVEL }),
+        default: STARTING_ITEM_LEVEL,
     });
 });
 
@@ -47,9 +65,10 @@ Hooks.on("renderApplicationV2", (app, element) => {
     const header = element.querySelector(".window-header");
     if (!header || header.querySelector(".sf2e-cc-header-button")) return;
 
-    const levelUp = !!actor.class;
+    const pending = getPendingSetup(actor).length > 0;
+    const levelUp = !!actor.class && !pending;
     if (levelUp && actor.level >= 20) return;
-    const label = game.i18n.localize(levelUp ? "SF2ECC.LevelUp" : "SF2ECC.OpenCreator");
+    const label = game.i18n.localize(pending ? "SF2ECC.FinishSetup" : levelUp ? "SF2ECC.LevelUp" : "SF2ECC.OpenCreator");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "header-control icon fa-solid fa-user-astronaut sf2e-cc-header-button";

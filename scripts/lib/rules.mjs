@@ -26,6 +26,15 @@ export const FEAT_CATEGORIES = ["ancestry", "class", "skill", "general"];
 
 const RARITY_ORDER = ["common", "uncommon", "rare", "unique"];
 
+/** Lowercase, hyphenated slug of a display name (the compendium rarely stores slugs). */
+export function slugify(name) {
+    return String(name ?? "")
+        .toLowerCase()
+        .replace(/['’]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
 /** Apply one boost to a modifier: +1 normally, +0.5 once the modifier is already +4 or higher. */
 export function applyBoost(mod) {
     return mod + (mod >= PARTIAL_BOOST_THRESHOLD ? 0.5 : 1);
@@ -201,7 +210,7 @@ export function isFeatEligible(entry, slot, context = {}) {
     const rarity = system.traits?.rarity ?? "common";
     if (!context.allowRare && RARITY_ORDER.indexOf(rarity) > 0) return false;
 
-    const slug = system.slug ?? entry.slug;
+    const slug = system.slug ?? slugify(entry.name);
     if (slug && context.ownedSlugs?.has(slug) && !system.maxTakable) return false;
 
     return true;
@@ -215,4 +224,66 @@ export function prerequisiteText(entry) {
 /** Expected HP gained by levelling up: class HP + Constitution modifier (never less than 1). */
 export function hitPointsPerLevel(classHp, conMod) {
     return Math.max(1, (classHp ?? 0) + Math.trunc(conMod ?? 0));
+}
+
+/* -------------------------------------------- */
+/*  Equipment shopping                          */
+/* -------------------------------------------- */
+
+/** Credits a new character may spend on starting gear. */
+export const STARTING_CREDITS = 150;
+
+/** Highest item level a new character may buy (common items of level 1 or lower). */
+export const STARTING_ITEM_LEVEL = 1;
+
+/**
+ * Convert a stored price object to credits. The system stores credits as silver pieces (1 credit = 1 sp),
+ * with copper at a tenth, gold at 10 and platinum at 100 credits; `credits` and `upb` count 1:1.
+ */
+export function priceInCredits(price) {
+    const v = price?.value ?? price ?? {};
+    const credits = (v.cp ?? 0) / 10 + (v.sp ?? 0) + (v.gp ?? 0) * 10 + (v.pp ?? 0) * 100 + (v.credits ?? 0) + (v.upb ?? 0);
+    return Math.ceil(credits);
+}
+
+/** Number of units bundled in one purchase (e.g. ammunition sold in stacks of 10). */
+export function purchaseUnit(price) {
+    return Math.max(1, Number(price?.per ?? 1) || 1);
+}
+
+/** Cost in credits of buying `units` purchase units of an item. */
+export function lineCost(price, units) {
+    return priceInCredits(price) * Math.max(0, units);
+}
+
+/** Total cost of a cart of `{ price, units }` lines. */
+export function cartTotal(lines) {
+    return lines.reduce((sum, line) => sum + lineCost(line.price, line.units), 0);
+}
+
+/** Can a purchasable index entry be bought by a new character? */
+export function isStarterItem(entry, { maxLevel = STARTING_ITEM_LEVEL, allowRare = false } = {}) {
+    const system = entry.system ?? {};
+    if (priceInCredits(system.price) <= 0) return false;
+    if ((system.level?.value ?? 0) > maxLevel) return false;
+    const rarity = system.traits?.rarity ?? "common";
+    if (!allowRare && rarity !== "common") return false;
+    return true;
+}
+
+/** Broad shop category for an equipment index entry (by item type). */
+export function shopCategory(type) {
+    switch (type) {
+        case "weapon":
+            return "weapons";
+        case "armor":
+            return "armor";
+        case "shield":
+            return "shields";
+        case "consumable":
+        case "ammo":
+            return "consumables";
+        default:
+            return "gear";
+    }
 }

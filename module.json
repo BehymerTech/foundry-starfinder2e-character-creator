@@ -1,8 +1,8 @@
 {
     "id": "sf2e-character-creator",
     "title": "Starfinder 2e Character Creator",
-    "description": "A guided, video-game style character creator and level-up wizard for the Starfinder 2e system. Walks players through ancestry, heritage, background, class, attributes, skills, and feats using the official rules and the system's own compendiums.",
-    "version": "0.1.0",
+    "description": "A guided, video-game style character creator and level-up wizard for the Starfinder 2e system. Walks players through ancestry, heritage, background, class, attributes, skills, feats, spells, and starting equipment using the official rules and the system's own compendiums.",
+    "version": "0.2.0",
     "compatibility": {
         "minimum": "14",
         "verified": "14.368"
