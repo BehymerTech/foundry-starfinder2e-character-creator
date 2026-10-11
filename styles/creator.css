@@ -1,0 +1,531 @@
+/* Starfinder 2e Character Creator. Everything is scoped under .sf2e-cc and uses Foundry's theme variables. */
+
+.sf2e-cc .window-content {
+    padding: 0;
+    overflow: hidden;
+}
+
+.sf2e-cc .sf2e-cc-shell {
+    --cc-accent: var(--color-warm-2, #c0612b);
+    --cc-ok: var(--color-level-success, #2e7d32);
+    --cc-bad: var(--color-level-error, #b3261e);
+    --cc-line: var(--color-border-light-2, rgb(128 128 128 / 0.35));
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "steps main" "steps footer";
+    height: 100%;
+    color: var(--color-text-primary, inherit);
+}
+
+.sf2e-cc .sf2e-cc-shell.with-detail {
+    grid-template-columns: 11rem minmax(0, 1fr) minmax(16rem, 22rem);
+    grid-template-areas: "steps main detail" "steps footer footer";
+}
+
+/* Step list */
+.sf2e-cc nav.sf2e-cc-steps {
+    grid-area: steps;
+    padding: 1rem 0.5rem;
+    border-right: 1px solid var(--cc-line);
+    background: rgb(0 0 0 / 0.12);
+    overflow-y: auto;
+}
+.sf2e-cc nav.sf2e-cc-steps ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.sf2e-cc nav.sf2e-cc-steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    opacity: 0.55;
+}
+.sf2e-cc nav.sf2e-cc-steps li[data-action] {
+    cursor: pointer;
+    opacity: 0.9;
+}
+.sf2e-cc nav.sf2e-cc-steps li.current {
+    opacity: 1;
+    font-weight: 700;
+    background: rgb(255 255 255 / 0.08);
+    box-shadow: inset 3px 0 0 var(--cc-accent);
+}
+.sf2e-cc nav.sf2e-cc-steps .num {
+    display: inline-grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    font-size: 0.75rem;
+}
+.sf2e-cc nav.sf2e-cc-steps li.done .num {
+    background: var(--cc-ok);
+    border-color: var(--cc-ok);
+    color: #fff;
+}
+
+/* Main column */
+.sf2e-cc main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+}
+.sf2e-cc main header {
+    padding: 0.75rem 1rem 0.25rem;
+}
+.sf2e-cc main header h2 {
+    margin: 0;
+    border: none;
+    font-size: 1.4rem;
+}
+.sf2e-cc main header p {
+    margin: 0.15rem 0 0;
+    opacity: 0.8;
+}
+.sf2e-cc .sf2e-cc-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem 1rem 1rem;
+}
+
+/* Detail pane */
+.sf2e-cc aside.sf2e-cc-detail {
+    grid-area: detail;
+    display: none;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.75rem 1rem;
+    border-left: 1px solid var(--cc-line);
+    background: rgb(0 0 0 / 0.08);
+}
+.sf2e-cc .with-detail aside.sf2e-cc-detail {
+    display: block;
+}
+.sf2e-cc .sf2e-cc-detail h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.25rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-detail h3 img {
+    width: 2rem;
+    height: 2rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-prose {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Footer */
+.sf2e-cc footer {
+    grid-area: footer;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--cc-line);
+}
+.sf2e-cc footer button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 8rem;
+}
+.sf2e-cc footer button.primary:not(:disabled) {
+    background: var(--cc-accent);
+    border-color: var(--cc-accent);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Search */
+.sf2e-cc .sf2e-cc-search {
+    position: relative;
+    margin: 0.25rem 0 0.5rem;
+}
+.sf2e-cc .sf2e-cc-search i {
+    position: absolute;
+    left: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.6;
+    pointer-events: none;
+}
+.sf2e-cc .sf2e-cc-search input {
+    width: 100%;
+    padding-left: 2rem;
+}
+
+/* Gallery cards */
+.sf2e-cc .sf2e-cc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.6rem;
+}
+.sf2e-cc .sf2e-cc-card {
+    position: relative;
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.6rem;
+    border: 1px solid var(--cc-line);
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.04);
+    cursor: pointer;
+    transition: transform 0.08s ease, border-color 0.08s ease, background 0.08s ease;
+}
+.sf2e-cc .sf2e-cc-card:hover,
+.sf2e-cc .sf2e-cc-card:focus-visible {
+    transform: translateY(-1px);
+    border-color: var(--cc-accent);
+    outline: none;
+}
+.sf2e-cc .sf2e-cc-card.selected {
+    border-color: var(--cc-accent);
+    background: rgb(192 97 43 / 0.18);
+    box-shadow: 0 0 0 1px var(--cc-accent);
+}
+.sf2e-cc .sf2e-cc-card img {
+    width: 3rem;
+    height: 3rem;
+    flex: none;
+    object-fit: contain;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-card-body {
+    min-width: 0;
+}
+.sf2e-cc .sf2e-cc-card h4 {
+    margin: 0;
+    font-size: 1rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-meta {
+    display: block;
+    margin: 0.1rem 0;
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+.sf2e-cc .sf2e-cc-source {
+    font-size: 0.7rem;
+    opacity: 0.55;
+}
+.sf2e-cc .sf2e-cc-icon {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.15rem 0.35rem;
+    border: none;
+    background: transparent;
+    opacity: 0.6;
+}
+.sf2e-cc .sf2e-cc-icon:hover {
+    opacity: 1;
+}
+.sf2e-cc .sf2e-cc-badge {
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    background: #98513d;
+    color: #fff;
+}
+.sf2e-cc .sf2e-cc-badge.rarity-rare { background: #002664; }
+.sf2e-cc .sf2e-cc-badge.rarity-unique { background: #5b2a86; }
+
+.sf2e-cc .sf2e-cc-subhead {
+    margin: 0.75rem 0 0.25rem;
+    border-bottom: 1px solid var(--cc-line);
+    font-size: 1rem;
+}
+.sf2e-cc .sf2e-cc-empty {
+    opacity: 0.6;
+    font-style: italic;
+}
+.sf2e-cc .sf2e-cc-help {
+    margin: 0.4rem 0;
+    opacity: 0.85;
+}
+
+/* Attribute rows */
+.sf2e-cc .sf2e-cc-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+}
+.sf2e-cc .sf2e-cc-row {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+}
+.sf2e-cc .sf2e-cc-row-label {
+    font-weight: 600;
+}
+.sf2e-cc .sf2e-cc-attrs {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(2.6rem, 1fr));
+    gap: 0.3rem;
+}
+.sf2e-cc .sf2e-cc-attrs.wide {
+    grid-template-columns: repeat(6, minmax(3.5rem, 1fr));
+    margin: 0.75rem 0;
+}
+.sf2e-cc .sf2e-cc-attr {
+    display: grid;
+    place-items: center;
+    height: 2.2rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--cc-line);
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+.sf2e-cc .sf2e-cc-attr.big {
+    height: 3.6rem;
+    font-size: 1.1rem;
+}
+.sf2e-cc .sf2e-cc-attr small {
+    font-weight: 400;
+    opacity: 0.8;
+}
+.sf2e-cc button.sf2e-cc-attr:disabled,
+.sf2e-cc .sf2e-cc-attr.off {
+    opacity: 0.25;
+}
+.sf2e-cc .sf2e-cc-attr.on {
+    background: var(--cc-ok);
+    border-color: var(--cc-ok);
+    color: #fff;
+    opacity: 1;
+}
+.sf2e-cc .sf2e-cc-attr.on.flaw {
+    background: var(--cc-bad);
+    border-color: var(--cc-bad);
+}
+.sf2e-cc .sf2e-cc-attr.fixed {
+    cursor: default;
+}
+.sf2e-cc .sf2e-cc-mods {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.4rem;
+    margin-top: 1rem;
+}
+.sf2e-cc .sf2e-cc-mod {
+    display: grid;
+    place-items: center;
+    padding: 0.5rem 0.25rem;
+    border: 1px solid var(--cc-line);
+    border-radius: 8px;
+    background: rgb(0 0 0 / 0.15);
+}
+.sf2e-cc .sf2e-cc-mod strong {
+    font-size: 1.5rem;
+}
+.sf2e-cc .sf2e-cc-mod em {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+.sf2e-cc .sf2e-cc-errors {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+    color: var(--cc-bad);
+}
+
+/* Skills */
+.sf2e-cc .sf2e-cc-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+}
+.sf2e-cc .sf2e-cc-skill {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    height: auto;
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    line-height: 1.2;
+}
+.sf2e-cc .sf2e-cc-skill small {
+    font-weight: 400;
+    opacity: 0.8;
+}
+.sf2e-cc .sf2e-cc-skill.on {
+    background: var(--cc-ok);
+    border-color: var(--cc-ok);
+    color: #fff;
+}
+.sf2e-cc .sf2e-cc-skill:disabled {
+    opacity: 0.55;
+}
+.sf2e-cc .sf2e-cc-skill.on:disabled {
+    opacity: 0.9;
+}
+
+/* Feats */
+.sf2e-cc .sf2e-cc-slot {
+    margin-bottom: 1.25rem;
+}
+.sf2e-cc .sf2e-cc-slot h3 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-picked {
+    margin-left: auto;
+    color: var(--cc-ok);
+    font-size: 0.9rem;
+}
+.sf2e-cc .sf2e-cc-needed {
+    margin-left: auto;
+    color: var(--cc-accent);
+    font-size: 0.9rem;
+}
+.sf2e-cc .sf2e-cc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    max-height: 22rem;
+    overflow-y: auto;
+}
+.sf2e-cc .sf2e-cc-feat {
+    position: relative;
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.4rem 2rem 0.4rem 0.5rem;
+    border: 1px solid var(--cc-line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.sf2e-cc .sf2e-cc-feat:hover,
+.sf2e-cc .sf2e-cc-feat:focus-visible {
+    border-color: var(--cc-accent);
+    outline: none;
+}
+.sf2e-cc .sf2e-cc-feat.selected {
+    border-color: var(--cc-accent);
+    background: rgb(192 97 43 / 0.18);
+}
+.sf2e-cc .sf2e-cc-feat img {
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-prereq {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+.sf2e-cc .sf2e-cc-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Level-up overview + review */
+.sf2e-cc .sf2e-cc-levelbanner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 0.5rem 0 1rem;
+    font-size: 2.5rem;
+    font-weight: 800;
+}
+.sf2e-cc .sf2e-cc-levelbanner .next {
+    color: var(--cc-accent);
+}
+.sf2e-cc .sf2e-cc-list-plain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.sf2e-cc .sf2e-cc-list-plain li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+}
+.sf2e-cc .sf2e-cc-list-plain img {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: none;
+}
+.sf2e-cc .sf2e-cc-list-plain a {
+    cursor: pointer;
+}
+.sf2e-cc .sf2e-cc-linkbtn {
+    width: auto;
+    margin: 0;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.8rem;
+}
+.sf2e-cc .sf2e-cc-name {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+.sf2e-cc .sf2e-cc-name input {
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 1.2rem;
+}
+.sf2e-cc table.sf2e-cc-review {
+    width: 100%;
+    border-collapse: collapse;
+}
+.sf2e-cc table.sf2e-cc-review th,
+.sf2e-cc table.sf2e-cc-review td {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--cc-line);
+    text-align: left;
+    vertical-align: top;
+}
+.sf2e-cc table.sf2e-cc-review th {
+    width: 11rem;
+    white-space: nowrap;
+}
+
+/* Actors directory button */
+.sf2e-cc-open {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+@media (max-width: 900px) {
+    .sf2e-cc .sf2e-cc-shell.with-detail {
+        grid-template-columns: 9rem minmax(0, 1fr);
+        grid-template-areas: "steps main" "steps footer";
+    }
+    .sf2e-cc .with-detail aside.sf2e-cc-detail {
+        display: none;
+    }
+}

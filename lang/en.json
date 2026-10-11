@@ -1,0 +1,130 @@
+{
+    "SF2ECC": {
+        "OpenCreator": "Character Creator",
+        "LevelUp": "Level Up",
+        "WrongSystem": "Starfinder 2e Character Creator requires the Starfinder 2e (sf2e) system.",
+        "NotACharacter": "The character creator only works on player characters.",
+        "MaxLevel": "This character is already level 20.",
+        "TitleCreate": "Create a Starfinder Character",
+        "TitleLevelUp": "{name}: Advance to Level {level}",
+        "UnnamedCharacter": "Unnamed Hero",
+        "Created": "{name} has been created.",
+        "LeveledUp": "{name} is now level {level}.",
+        "ApplyFailed": "The character creator could not finish: {message}",
+
+        "Settings": {
+            "AllowRare": {
+                "Name": "Show uncommon and rare feats",
+                "Hint": "Include feats with the uncommon, rare, or unique rarity in the feat pickers. Check with your GM first."
+            }
+        },
+
+        "Back": "Back",
+        "Next": "Next",
+        "CreateCharacter": "Create Character",
+        "ApplyLevelUp": "Level Up",
+        "Search": "Search…",
+        "NoResults": "Nothing matches.",
+        "Details": "Details",
+        "OpenEntry": "Open full entry",
+        "DetailPlaceholder": "Select an option to read about it here.",
+        "HP": "HP",
+        "Free": "Free",
+        "Boost": "Boost",
+        "Flaw": "Flaw",
+        "Ancestry": "Ancestry",
+        "Heritage": "Heritage",
+        "Background": "Background",
+        "Class": "Class",
+        "Attributes": "Attributes",
+        "Skills": "Skills",
+        "Level": "Level",
+        "LevelShort": "Lv",
+        "KeyAttribute": "Key attribute",
+        "Prerequisites": "Prerequisites",
+        "ChooseOne": "Choose one",
+        "ShowRare": "Show uncommon and rare options",
+        "VersatileHeritages": "Versatile heritages",
+        "NoHeritages": "This ancestry has no heritages in the compendium. You can continue.",
+
+        "Step": {
+            "ancestry": "Ancestry",
+            "heritage": "Heritage",
+            "background": "Background",
+            "class": "Class",
+            "attributes": "Attributes",
+            "skills": "Skills",
+            "feats": "Feats",
+            "review": "Review",
+            "overview": "Overview"
+        },
+        "StepHelp": {
+            "ancestry": "Who are you? Your ancestry sets your hit points, size, speed, and the first of your attribute boosts.",
+            "heritage": "Heritages are the traits that set you apart within your ancestry.",
+            "background": "What did you do before adventuring? Your background gives attribute boosts, trained skills, and a skill feat.",
+            "class": "What do you do best? Your class defines your role, proficiencies, and abilities.",
+            "attributes": "Assign your attribute boosts. Each choice below follows the official character creation rules.",
+            "skills": "Choose the skills you are trained in.",
+            "feats": "Pick the feats that open up at this level.",
+            "review": "Make sure everything looks right, then finish.",
+            "overview": "Here is what advancing brings."
+        },
+
+        "AttributesHelp": "Your ancestry, background, and class each grant boosts. Boosts from one source must go to different attributes. Then spend four free boosts on four different attributes. You cannot start above +4.",
+        "FreeBoosts": "Free boosts ({n}/{max})",
+        "Error": {
+            "ancestryDuplicate": "Ancestry boosts must go to different attributes.",
+            "backgroundDuplicate": "Background boosts must go to different attributes.",
+            "freeDuplicate": "Free boosts must go to four different attributes.",
+            "overCap": "No attribute can start higher than +4. Move a boost elsewhere."
+        },
+        "LevelBoostsHelp": "Level {level} grants four attribute boosts, each to a different attribute. A boost to an attribute that is already +4 or higher only counts for half a step.",
+        "PartialBoost": "Partial boost (counts as +½)",
+
+        "SkillsHelp": "Choose {n} additional trained skills ({remaining} left). Skills already trained by your class or background are marked.",
+        "LoreSkills": "Lore skills",
+        "From": {
+            "class": "class",
+            "background": "background"
+        },
+        "SkillIncreaseHelp": "Level {level} grants a skill increase. Raise one skill by one proficiency rank.",
+        "Rank": {
+            "untrained": "Untrained",
+            "trained": "Trained",
+            "expert": "Expert",
+            "master": "Master",
+            "legendary": "Legendary"
+        },
+
+        "Slot": {
+            "ancestry": "Ancestry feat",
+            "class": "Class feat",
+            "skill": "Skill feat",
+            "general": "General feat"
+        },
+        "NoFeats": "No feats to choose here.",
+
+        "YouGain": "You gain",
+        "HpGain": "{hp} hit points ({classHp} from your class + {con} Constitution)",
+        "ClassFeatures": "New class features",
+        "NoNewFeatures": "No new class features at this level.",
+        "AutoGranted": "Class features are added to your sheet automatically. If one asks you to make a choice, a prompt will appear when you finish.",
+        "YourChoices": "Your choices",
+        "NoChoices": "Nothing to choose at this level.",
+        "Todo": {
+            "attributes": "Four attribute boosts",
+            "skillIncrease": "A skill increase",
+            "feat": {
+                "ancestry": "An ancestry feat",
+                "class": "A class feat",
+                "skill": "A skill feat",
+                "general": "A general feat"
+            }
+        },
+
+        "CharacterName": "Character name",
+        "CharacterNamePlaceholder": "Name your hero",
+        "ReviewCreateNote": "Finishing adds your choices to the character sheet. Some class features and feats may ask you to make further choices.",
+        "ReviewLevelNote": "Finishing raises your level and adds the choices above to your sheet."
+    }
+}

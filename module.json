@@ -1,0 +1,41 @@
+{
+    "id": "sf2e-character-creator",
+    "title": "Starfinder 2e Character Creator",
+    "description": "A guided, video-game style character creator and level-up wizard for the Starfinder 2e system. Walks players through ancestry, heritage, background, class, attributes, skills, and feats using the official rules and the system's own compendiums.",
+    "version": "0.1.0",
+    "compatibility": {
+        "minimum": "14",
+        "verified": "14.368"
+    },
+    "authors": [
+        {
+            "name": "BehymerTech",
+            "url": "https://github.com/BehymerTech"
+        }
+    ],
+    "relationships": {
+        "systems": [
+            {
+                "id": "sf2e",
+                "type": "system",
+                "compatibility": {
+                    "minimum": "1.6.0"
+                }
+            }
+        ]
+    },
+    "esmodules": ["scripts/main.mjs"],
+    "styles": ["styles/creator.css"],
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "lang/en.json"
+        }
+    ],
+    "url": "https://github.com/BehymerTech/foundry-starfinder2e-character-creator",
+    "manifest": "https://github.com/BehymerTech/foundry-starfinder2e-character-creator/releases/latest/download/module.json",
+    "download": "https://github.com/BehymerTech/foundry-starfinder2e-character-creator/releases/latest/download/module.zip",
+    "bugs": "https://github.com/BehymerTech/foundry-starfinder2e-character-creator/issues",
+    "license": "LICENSE"
+}
